@@ -9,6 +9,7 @@ import (
 // *http.Requestオブジェクトからのデコード
 func decodeBody(r *http.Request, v interface{}) error {
 	defer r.Body.Close()
+	// https://xn--go-hh0g6u.com/pkg/encoding/json/#Decoder.Decode
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
