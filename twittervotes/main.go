@@ -64,6 +64,7 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	go func() {
 		<-signalChan
+		// 後続の処理はsignalChanが受信するまで動かない
 		stoplock.Lock()
 		stop = true
 		stoplock.Unlock()
@@ -72,16 +73,24 @@ func main() {
 		closeConn()
 	}()
 
+	// プロセス実行中に Ctrl+C だのを叩いた（シグナルを送った）とき、その通知をプログラム内で受け取る。
+	// https://qiita.com/TubAnri/items/019f8d19b91f32c878cf
+	// 要はシグナルをsignalChanが受信し、処理を安全に停止する
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := dialdb(); err != nil {
 		log.Fatalln("MongoDBへのダイヤルに失敗しました:", err)
 	}
+	// プログラムの最後にDBとの接続を閉じる
 	defer closedb()
 
-	// 処理を開始します
-	votes := make(chan string) // 投票結果のためのチャネル
+	// 処理の開始します
+	votes := make(chan string)
+
+	// publishVotesの戻り値はNSQの停止チャネル
 	publisherStoppedChan := publishVotes(votes)
+
+	// startTwitterStreamの戻り値はTwitterAPIとの通信の停止チャネル
 	twitterStoppedChan := startTwitterStream(stopChan, votes)
 	go func() {
 		for {
